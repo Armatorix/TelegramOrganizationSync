@@ -1,0 +1,24 @@
+# Example client config. Env vars (TOS_*) override these values.
+server:
+  url: http://localhost:8080
+  api_key: dev-api-key
+
+# auto: client adds/removes members directly via Telegram
+# manual: client only DMs the channel manager with the proposed diff
+mode: manual
+
+telegram:
+  # Local dev: point at a JSON file. Comment this out and fill the rest
+  # for real TDLib (build with -tags tdlib).
+  fake_state_file: ./fake-telegram.json
+
+  # api_id: 123456
+  # api_hash: 0123456789abcdef0123456789abcdef
+  # database_dir: ./tdlib-db
+  # phone_number: "+15551234567"   # use this OR bot_token, not both
+  # bot_token: "123:abc"
+
+sync:
+  interval: 30s
+  batch_size: 200
+  dry_run: false

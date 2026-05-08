@@ -1,0 +1,20 @@
+{
+  "channels": [
+    {
+      "telegram_chat_id": -1001000000001,
+      "title": "engineering-announce",
+      "members": [
+        { "telegram_user_id": 100, "name": "Alice" },
+        { "telegram_user_id": 200, "name": "Bob" }
+      ]
+    },
+    {
+      "telegram_chat_id": -1001000000002,
+      "title": "ops-incidents",
+      "members": [
+        { "telegram_user_id": 100, "name": "Alice" }
+      ]
+    }
+  ],
+  "dms": []
+}
