@@ -6,8 +6,8 @@ import (
 	"errors"
 	"log/slog"
 
-	"github.com/Armatorix/TelegramOrganizationSync/internal/config"
-	"github.com/Armatorix/TelegramOrganizationSync/internal/telegram"
+	"github.com/Armatorix/TelegramOrganizationSync/internal/client/config"
+	"github.com/Armatorix/TelegramOrganizationSync/internal/client/telegram"
 )
 
 func newTDLib(_ config.Config, _ *slog.Logger) (telegram.Adapter, error) {

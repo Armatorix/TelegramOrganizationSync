@@ -60,7 +60,9 @@ mode: auto       # apply diffs directly via Telegram
 | `make setup`     | copy example config files into place        |
 | `make vet`       | `go vet ./...`                              |
 | `make tidy`      | `go mod tidy`                               |
-| `make test`      | `go test ./...`                             |
+| `make test`      | `go test -race ./...`                       |
+| `make lint`      | `golangci-lint run` (requires golangci-lint)|
+| `make ci`        | what CI runs: build (both tags) + vet + test|
 | `make clean`     | remove `./bin/` (keeps your config files)   |
 
 Override addresses or paths via env:
@@ -85,8 +87,9 @@ without TDLib installed. To talk to real Telegram:
 
 1. Install the TDLib C library — see <https://tdlib.github.io/td/build.html>.
 2. `go get github.com/zelenin/go-tdlib/client` and finish the wiring in
-   [internal/telegram/tdlib.go](internal/telegram/tdlib.go) (the file is a
-   scaffold with the right interface and a wiring checklist at the top).
+   [internal/client/telegram/tdlib.go](internal/client/telegram/tdlib.go)
+   (the file is a scaffold with the right interface and a wiring checklist
+   at the top).
 3. Build with the `tdlib` tag: `go build -tags tdlib ./cmd/tos`.
 4. In `config.yaml`, remove `telegram.fake_state_file` and fill in `api_id`,
    `api_hash`, `database_dir`, and exactly one of `phone_number` /
@@ -112,14 +115,22 @@ All fields can also be supplied via env (`TOS_*`); env overrides the YAML.
 
 ## Layout
 
+The repo is split into two halves: the production-bound **client** under
+`internal/client/...`, and the dev-only **fake server** under
+`internal/devserver/`. They share only the wire types in `internal/api/`,
+so removing the dev server is a single `rm -rf` away.
+
 ```
-cmd/tos/             # sync client
-cmd/devserver/       # local org server with admin UI (dev only)
-internal/api/        # wire types shared by client and server
-internal/config/     # YAML + env config loader
-internal/server/     # HTTP client for the three spec endpoints
-internal/telegram/   # adapter interface, fake (default), TDLib (build-tagged)
-internal/sync/       # tick loop, mode dispatch, safety rails
-internal/devserver/  # in-memory store, admin handlers, embedded UI
-DESIGN.md            # full design spec
+cmd/
+  tos/                          # client binary
+  devserver/                    # dev-only fake-server binary
+internal/
+  api/                          # wire types shared by client and server
+  client/                       # everything the production client needs
+    config/                     #   YAML + env config loader
+    orgclient/                  #   HTTP client for the three spec endpoints
+    syncengine/                 #   tick loop, mode dispatch, safety rails
+    telegram/                   #   adapter interface + fake + TDLib scaffold
+  devserver/                    # in-memory store, admin handlers, embedded UI
+DESIGN.md                       # full design spec
 ```

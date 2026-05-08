@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/Armatorix/TelegramOrganizationSync/internal/api"
 )
@@ -258,6 +257,3 @@ func parseMembers(raw string) ([]api.Member, error) {
 	}
 	return out, scanner.Err()
 }
-
-// Used only as a sanity touch-point to keep the time import live in tests.
-var _ = time.Now

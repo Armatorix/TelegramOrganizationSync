@@ -1,0 +1,44 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: true
+
+      - name: go mod download
+        run: go mod download
+
+      - name: vet
+        run: go vet ./...
+
+      - name: build (default tags)
+        run: go build ./...
+
+      - name: build (-tags tdlib)
+        run: go build -tags tdlib ./...
+
+      - name: test
+        run: go test -race ./...
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: true
+      - uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --timeout=3m

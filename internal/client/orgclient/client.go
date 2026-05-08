@@ -1,7 +1,7 @@
-// Package server is the HTTP client the sync engine uses to talk to the
-// organization server. Three endpoints, no retries — the engine owns retry
-// semantics by virtue of running on a tick.
-package server
+// Package orgclient is the HTTP client the sync engine uses to talk to
+// the organization server. Three endpoints, no retries — the engine owns
+// retry semantics by virtue of running on a tick.
+package orgclient
 
 import (
 	"bytes"

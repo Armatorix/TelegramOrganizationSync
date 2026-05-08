@@ -1,0 +1,15 @@
+# build artifacts
+/bin/
+
+# local-only config files (created from *.example.* by `make setup`)
+/config.yaml
+/fake-telegram.json
+
+# TDLib persistent state
+/tdlib-db/
+
+# editor/OS noise
+*.swp
+.DS_Store
+.idea/
+.vscode/

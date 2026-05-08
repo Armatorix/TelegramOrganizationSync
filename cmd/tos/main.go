@@ -13,10 +13,10 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/Armatorix/TelegramOrganizationSync/internal/config"
-	"github.com/Armatorix/TelegramOrganizationSync/internal/server"
-	syncpkg "github.com/Armatorix/TelegramOrganizationSync/internal/sync"
-	"github.com/Armatorix/TelegramOrganizationSync/internal/telegram"
+	"github.com/Armatorix/TelegramOrganizationSync/internal/client/config"
+	"github.com/Armatorix/TelegramOrganizationSync/internal/client/orgclient"
+	"github.com/Armatorix/TelegramOrganizationSync/internal/client/syncengine"
+	"github.com/Armatorix/TelegramOrganizationSync/internal/client/telegram"
 )
 
 func main() {
@@ -38,9 +38,9 @@ func run() error {
 		return fmt.Errorf("config: %w", err)
 	}
 
-	srv, err := server.New(cfg.Server.URL, cfg.Server.APIKey)
+	srv, err := orgclient.New(cfg.Server.URL, cfg.Server.APIKey)
 	if err != nil {
-		return fmt.Errorf("server client: %w", err)
+		return fmt.Errorf("org client: %w", err)
 	}
 
 	tg, err := newTelegram(cfg, log)
@@ -52,7 +52,7 @@ func run() error {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	engine := syncpkg.New(cfg, srv, tg, log)
+	engine := syncengine.New(cfg, srv, tg, log)
 	if err := engine.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 		return err
 	}

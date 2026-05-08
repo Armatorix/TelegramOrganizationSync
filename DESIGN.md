@@ -268,23 +268,32 @@ Notes specific to TDLib:
 
 ## 8. Project layout
 
+The repo splits the production-bound client from the dev-only fake server
+at the directory level: anything under `internal/client/` ships with the
+client, anything under `internal/devserver/` is dev-only.
+
 ```
 .
 ├── cmd/
-│   └── tos/                 # main; flags, config load, signal handling
+│   ├── tos/                 # client binary
+│   └── devserver/           # dev-only fake-server binary
 ├── internal/
-│   ├── config/              # Config struct + loader (yaml + env)
-│   ├── server/              # typed HTTP client for the 3 endpoints
-│   ├── telegram/            # TDLib adapter + interface + fake for tests
-│   ├── sync/                # Engine, tick loop, diff application
-│   └── log/                 # slog setup
+│   ├── api/                 # wire types shared by client and server
+│   ├── client/
+│   │   ├── config/          # YAML + env loader
+│   │   ├── orgclient/       # HTTP client for the 3 spec endpoints
+│   │   ├── syncengine/      # tick loop, mode dispatch, safety rails
+│   │   └── telegram/        # adapter interface + fake + TDLib scaffold
+│   └── devserver/           # in-memory store, admin handlers, embedded UI
 ├── DESIGN.md                # this file
 ├── go.mod
 └── go.sum
 ```
 
-`internal/` keeps the surface area unimportable from outside, which matches
-the "single binary" goal.
+`internal/` keeps the surface area unimportable from outside. The
+`internal/client/` ↔ `internal/devserver/` split means a fork that wants
+only the client can `rm -rf cmd/devserver internal/devserver` without
+touching anything else.
 
 ## 9. Reconciliation sequence (auto mode)
 

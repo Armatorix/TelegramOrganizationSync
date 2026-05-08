@@ -1,7 +1,8 @@
-// Package sync owns the reconciliation loop. It pulls channels from the
-// org server, snapshots Telegram membership, asks the server for a diff,
-// and either applies it (auto) or notifies the manager (manual).
-package sync
+// Package syncengine owns the reconciliation loop. It pulls channels
+// from the org server, snapshots Telegram membership, asks the server
+// for a diff, and either applies it (auto) or notifies the manager
+// (manual).
+package syncengine
 
 import (
 	"context"
@@ -11,9 +12,9 @@ import (
 	"time"
 
 	"github.com/Armatorix/TelegramOrganizationSync/internal/api"
-	"github.com/Armatorix/TelegramOrganizationSync/internal/config"
-	"github.com/Armatorix/TelegramOrganizationSync/internal/server"
-	"github.com/Armatorix/TelegramOrganizationSync/internal/telegram"
+	"github.com/Armatorix/TelegramOrganizationSync/internal/client/config"
+	"github.com/Armatorix/TelegramOrganizationSync/internal/client/orgclient"
+	"github.com/Armatorix/TelegramOrganizationSync/internal/client/telegram"
 )
 
 // dangerousRemovalRatio aborts auto-mode application if the server asks
@@ -24,12 +25,12 @@ const dangerousRemovalRatio = 0.5
 
 type Engine struct {
 	cfg    config.Config
-	server *server.Client
+	server *orgclient.Client
 	tg     telegram.Adapter
 	log    *slog.Logger
 }
 
-func New(cfg config.Config, srv *server.Client, tg telegram.Adapter, log *slog.Logger) *Engine {
+func New(cfg config.Config, srv *orgclient.Client, tg telegram.Adapter, log *slog.Logger) *Engine {
 	return &Engine{cfg: cfg, server: srv, tg: tg, log: log}
 }
 
