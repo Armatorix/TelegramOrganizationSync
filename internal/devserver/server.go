@@ -18,18 +18,19 @@ import (
 var uiFS embed.FS
 
 type Server struct {
-	store  *Store
-	apiKey string
-	log    *slog.Logger
-	tmpl   *template.Template
+	store       *Store
+	apiKey      string
+	log         *slog.Logger
+	tmpl        *template.Template
+	openapiPath string // optional; if non-empty and the file is readable, served at /openapi.yaml
 }
 
-func New(store *Store, apiKey string, log *slog.Logger) (*Server, error) {
+func New(store *Store, apiKey string, openapiPath string, log *slog.Logger) (*Server, error) {
 	tmpl, err := template.ParseFS(uiFS, "ui.html")
 	if err != nil {
 		return nil, fmt.Errorf("parse ui template: %w", err)
 	}
-	return &Server{store: store, apiKey: apiKey, log: log, tmpl: tmpl}, nil
+	return &Server{store: store, apiKey: apiKey, log: log, tmpl: tmpl, openapiPath: openapiPath}, nil
 }
 
 func (s *Server) Handler() http.Handler {
@@ -40,6 +41,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/channels", s.requireAPIKey(s.createChannel))
 	mux.HandleFunc("POST /api/v1/channels/{id}/members:reconcile", s.requireAPIKey(s.reconcile))
 
+	// OpenAPI spec — served unauthenticated since it's a public contract.
+	if s.openapiPath != "" {
+		mux.HandleFunc("GET /openapi.yaml", s.serveOpenAPI)
+	}
+
 	// Admin UI (no api key — local dev)
 	mux.HandleFunc("GET /", s.indexPage)
 	mux.HandleFunc("POST /admin/channels", s.adminCreate)
@@ -49,6 +55,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /admin/channels/{id}/delete", s.adminDelete)
 
 	return mux
+}
+
+func (s *Server) serveOpenAPI(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/yaml; charset=utf-8")
+	http.ServeFile(w, r, s.openapiPath)
 }
 
 // --- API ---

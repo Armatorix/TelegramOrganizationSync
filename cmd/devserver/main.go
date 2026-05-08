@@ -29,12 +29,21 @@ func main() {
 func run() error {
 	addr := flag.String("addr", ":8080", "listen address")
 	apiKey := flag.String("api-key", envDefault("TOS_DEV_API_KEY", "dev-api-key"), "API key required by the spec endpoints")
+	openapi := flag.String("openapi", "api/openapi.yaml", "path to OpenAPI spec to serve at /openapi.yaml; empty to disable")
 	flag.Parse()
 
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
+	openapiPath := *openapi
+	if openapiPath != "" {
+		if _, err := os.Stat(openapiPath); err != nil {
+			log.Warn("openapi spec not found; /openapi.yaml route disabled", "path", openapiPath, "err", err)
+			openapiPath = ""
+		}
+	}
+
 	store := devserver.NewStore()
-	srv, err := devserver.New(store, *apiKey, log)
+	srv, err := devserver.New(store, *apiKey, openapiPath, log)
 	if err != nil {
 		return fmt.Errorf("build server: %w", err)
 	}
@@ -50,7 +59,7 @@ func run() error {
 
 	errCh := make(chan error, 1)
 	go func() {
-		log.Info("devserver listening", "addr", *addr, "api_key", *apiKey)
+		log.Info("devserver listening", "addr", *addr, "api_key", *apiKey, "openapi", openapiPath)
 		if err := httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 			return

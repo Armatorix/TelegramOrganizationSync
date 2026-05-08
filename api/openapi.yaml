@@ -1,0 +1,363 @@
+openapi: 3.0.3
+
+info:
+  title: TelegramOrganizationSync — Organization Server API
+  version: 1.0.0
+  description: |
+    The contract that any organization server must implement to be driven
+    by the `tos` client. Three endpoints, JSON in/out, Bearer auth.
+
+    The client polls these endpoints on a configurable interval. The
+    server is the source of truth for which channels are under sync, who
+    manages them, and what membership should look like; the client
+    contributes by registering newly-discovered Telegram channels and by
+    snapshotting current Telegram membership.
+
+    See [DESIGN.md](../DESIGN.md) for the full design doc, including
+    sequence flows, operating modes, and safety rails.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  contact:
+    name: TelegramOrganizationSync
+    url: https://github.com/Armatorix/TelegramOrganizationSync
+
+servers:
+  - url: http://localhost:8080
+    description: Local dev server (cmd/devserver)
+  - url: https://{host}
+    description: Production
+    variables:
+      host:
+        default: org.example.com
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: channels
+    description: Channel registry — what is under sync, who manages it.
+  - name: reconcile
+    description: Membership snapshot/diff endpoint.
+
+paths:
+  /api/v1/channels:
+    get:
+      tags: [channels]
+      operationId: listChannels
+      summary: List all channels the server knows about
+      description: |
+        Returns every channel — both `enabled` and `disabled`. The client
+        only reconciles those with `sync_status: enabled`; disabled rows
+        are returned so the client can avoid re-registering them.
+      responses:
+        "200":
+          description: All known channels.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Channel"
+              examples:
+                mixed:
+                  summary: One enabled with a manager, one freshly-discovered
+                  value:
+                    - id: ch_01HX0000000000000000000001
+                      telegram_chat_id: -1001234567890
+                      title: engineering-announce
+                      sync_status: enabled
+                      manager:
+                        telegram_user_id: 42424242
+                        name: Anna Manager
+                    - id: ch_01HX0000000000000000000002
+                      telegram_chat_id: -1009876543210
+                      title: ops-incidents
+                      sync_status: disabled
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    post:
+      tags: [channels]
+      operationId: createChannel
+      summary: Register a discovered Telegram channel
+      description: |
+        Idempotent on `telegram_chat_id`. If the channel is already known,
+        the server returns the existing record unchanged. Newly created
+        channels are always returned with `sync_status: disabled` — only
+        humans (via the server's UI) may enable sync. The client never
+        gets to enable sync.
+
+        This endpoint exists so that when the Telegram account is added
+        to a new chat, the server learns about it without manual data
+        entry. A human operator then chooses whether to opt the channel
+        in to sync.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateChannelRequest"
+            examples:
+              minimal:
+                value:
+                  telegram_chat_id: -1009876543210
+                  title: ops-incidents
+      responses:
+        "200":
+          description: |
+            The canonical channel record. Returned for both newly created
+            channels and for repeat calls with a known `telegram_chat_id`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Channel"
+              examples:
+                disabled:
+                  value:
+                    id: ch_01HX0000000000000000000002
+                    telegram_chat_id: -1009876543210
+                    title: ops-incidents
+                    sync_status: disabled
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  "/api/v1/channels/{id}/members:reconcile":
+    post:
+      tags: [reconcile]
+      operationId: reconcileMembers
+      summary: Submit current Telegram membership; receive a diff
+      description: |
+        Snapshot-and-diff. The client sends the membership it currently
+        observes on Telegram for this channel; the server compares it
+        against its authoritative expected list and returns the delta.
+
+        The client treats the response as authoritative for the current
+        tick and does not re-derive it locally. Both `to_add` and
+        `to_remove` are always present (possibly empty).
+
+        The endpoint name follows the
+        [AIP-136](https://google.aip.dev/136) custom-method convention:
+        `:reconcile` is a literal suffix on the path, not a path
+        parameter.
+      parameters:
+        - $ref: "#/components/parameters/ChannelID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReconcileRequest"
+            examples:
+              snapshot:
+                value:
+                  members:
+                    - telegram_user_id: 11111
+                      name: Alice
+                    - telegram_user_id: 22222
+                      name: Bob
+      responses:
+        "200":
+          description: The diff to apply against the Telegram channel.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReconcileResponse"
+              examples:
+                drift:
+                  summary: Add one, remove one
+                  value:
+                    to_add:
+                      - telegram_user_id: 33333
+                        name: Carol
+                    to_remove:
+                      - telegram_user_id: 22222
+                        name: Bob
+                in_sync:
+                  summary: No changes needed
+                  value:
+                    to_add: []
+                    to_remove: []
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: |
+        Static API key passed as `Authorization: Bearer <key>`. The key
+        is provisioned out of band; rotation is server-defined.
+
+  parameters:
+    ChannelID:
+      name: id
+      in: path
+      required: true
+      description: Server-assigned channel id (opaque, returned by `listChannels`).
+      schema:
+        type: string
+        minLength: 1
+        example: ch_01HX0000000000000000000001
+
+  responses:
+    BadRequest:
+      description: Malformed request body or missing required field.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+          example:
+            title: invalid body
+            status: 400
+            detail: "telegram_chat_id required"
+    Unauthorized:
+      description: Missing or invalid API key.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+          example:
+            title: unauthorized
+            status: 401
+            detail: missing or invalid api key
+    NotFound:
+      description: No channel with the given `id`.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+          example:
+            title: channel not found
+            status: 404
+            detail: id=ch_unknown
+
+  schemas:
+
+    Channel:
+      type: object
+      required: [id, telegram_chat_id, title, sync_status]
+      properties:
+        id:
+          type: string
+          description: Opaque server-assigned identifier; stable across renames.
+          example: ch_01HX0000000000000000000001
+        telegram_chat_id:
+          type: integer
+          format: int64
+          description: |
+            Telegram's own chat id. Negative for supergroups/channels.
+            This is the natural key the client uses for idempotent
+            registration via `POST /channels`.
+          example: -1001234567890
+        title:
+          type: string
+          description: Human-readable channel name as the client observed it on Telegram.
+          example: engineering-announce
+        sync_status:
+          type: string
+          enum: [enabled, disabled]
+          description: |
+            Whether the client should reconcile this channel's
+            membership. Newly-registered channels are always `disabled`;
+            promotion to `enabled` is a human action on the server side.
+          example: enabled
+        manager:
+          $ref: "#/components/schemas/Manager"
+
+    Manager:
+      type: object
+      description: |
+        Telegram user the client DMs in manual mode (or as a fallback in
+        auto mode when the safety rail trips). Required to be set before
+        `sync_status` may be flipped to `enabled`.
+      required: [telegram_user_id, name]
+      properties:
+        telegram_user_id:
+          type: integer
+          format: int64
+          example: 42424242
+        name:
+          type: string
+          example: Anna Manager
+
+    Member:
+      type: object
+      required: [telegram_user_id, name]
+      properties:
+        telegram_user_id:
+          type: integer
+          format: int64
+          example: 11111
+        name:
+          type: string
+          example: Alice
+
+    CreateChannelRequest:
+      type: object
+      required: [telegram_chat_id, title]
+      properties:
+        telegram_chat_id:
+          type: integer
+          format: int64
+          example: -1009876543210
+        title:
+          type: string
+          example: ops-incidents
+
+    ReconcileRequest:
+      type: object
+      required: [members]
+      properties:
+        members:
+          type: array
+          description: |
+            Full current Telegram membership for the channel as observed
+            by the client. Order is not significant; duplicates are not
+            allowed.
+          items:
+            $ref: "#/components/schemas/Member"
+
+    ReconcileResponse:
+      type: object
+      required: [to_add, to_remove]
+      properties:
+        to_add:
+          type: array
+          description: Members the client should add to Telegram (auto mode) or include in the manager DM (manual mode).
+          items:
+            $ref: "#/components/schemas/Member"
+        to_remove:
+          type: array
+          description: Members the client should remove or, in manual mode, list to the manager.
+          items:
+            $ref: "#/components/schemas/Member"
+
+    Problem:
+      type: object
+      description: |
+        RFC 7807 problem-details envelope. Always served with
+        `Content-Type: application/problem+json`.
+      required: [title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+          description: A URI identifying the problem type. Optional.
+        title:
+          type: string
+          description: Short, human-readable summary of the problem.
+        status:
+          type: integer
+          description: HTTP status code, copied here for convenience.
+        detail:
+          type: string
+          description: Human-readable explanation specific to this occurrence.

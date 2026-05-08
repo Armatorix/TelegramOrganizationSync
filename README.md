@@ -3,8 +3,12 @@
 A Go daemon that uses [TDLib](https://core.telegram.org/tdlib/docs/) to keep
 Telegram channel membership in sync with an authoritative organization server.
 
-The full design — endpoints, sequence flows, safety rails, open questions —
-lives in [DESIGN.md](DESIGN.md). This README is the quickstart.
+- [DESIGN.md](DESIGN.md) — full design (sequence flows, modes, safety rails)
+- [api/openapi.yaml](api/openapi.yaml) — OpenAPI 3.0.3 contract any production
+  org server must implement (and that the bundled dev server in
+  `cmd/devserver/` already serves)
+
+This README is the quickstart.
 
 ## Quickstart
 
@@ -121,6 +125,8 @@ The repo is split into two halves: the production-bound **client** under
 so removing the dev server is a single `rm -rf` away.
 
 ```
+api/
+  openapi.yaml                  # canonical contract for any org server
 cmd/
   tos/                          # client binary
   devserver/                    # dev-only fake-server binary

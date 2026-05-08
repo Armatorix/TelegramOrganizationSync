@@ -103,6 +103,10 @@ to bring up TDLib but are operational, not policy.
 
 ## 5. Server API contract
 
+The machine-readable contract lives at [api/openapi.yaml](api/openapi.yaml)
+(OpenAPI 3.0.3) — the bullets and JSON snippets below are kept in sync
+with that spec; treat the YAML as authoritative if they ever drift.
+
 All requests:
 - `Authorization: Bearer <api-key>` header.
 - JSON in / JSON out, UTF-8.
